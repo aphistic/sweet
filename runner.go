@@ -6,16 +6,21 @@ import (
 	"testing"
 )
 
-const (
-	setUpTestName    = "SetUpTest"
-	tearDownTestName = "TearDownTest"
-)
-
 var (
 	setUpAllTests func(t *testing.T) = nil
 
 	setUpSuiteName   = "SetUpSuite"
 	setUpSuiteParams = []reflect.Type{}
+
+	setUpTestName   = "SetUpTest"
+	setUpTestParams = []reflect.Type{
+		reflect.TypeOf(&testing.T{}),
+	}
+
+	tearDownTestName   = "TearDownTest"
+	tearDownTestParams = []reflect.Type{
+		reflect.TypeOf(&testing.T{}),
+	}
 
 	tearDownSuiteName   = "TearDownSuite"
 	tearDownSuiteParams = []reflect.Type{}
@@ -77,10 +82,24 @@ func RunSuite(t *testing.T, suite interface{}) {
 
 				tVal := reflect.ValueOf(t)
 				if setUpTestVal.IsValid() && setUpTestVal.Kind() == reflect.Func {
+					setUpTestType, _ := suiteType.MethodByName(setUpTestName)
+
+					if !hasParams(setUpTestType, setUpTestParams) {
+						panic(fmt.Sprintf("%s expects %d parameter(s)", setUpTestName, len(setUpTestParams)))
+					}
+
 					setUpTestVal.Call([]reflect.Value{tVal})
 				}
+
 				methodVal.Call([]reflect.Value{tVal})
+
 				if tearDownTestVal.IsValid() && tearDownTestVal.Kind() == reflect.Func {
+					tearDownTestType, _ := suiteType.MethodByName(tearDownTestName)
+
+					if !hasParams(tearDownTestType, tearDownTestParams) {
+						panic(fmt.Sprintf("%s expects %d parameter(s)", tearDownTestName, len(tearDownTestParams)))
+					}
+
 					tearDownTestVal.Call([]reflect.Value{tVal})
 				}
 			})
