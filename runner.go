@@ -3,11 +3,12 @@ package sweet
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 )
 
 var (
-	setUpAllTests func(t *testing.T) = nil
+	setUpAllTests func(t *testing.T)
 
 	setUpSuiteName   = "SetUpSuite"
 	setUpSuiteParams = []reflect.Type{}
@@ -40,6 +41,9 @@ func SetUpAllTests(f func(t *testing.T)) func(t *testing.T) {
 }
 
 func RunSuite(t *testing.T, suite interface{}) {
+	var testGroup sync.WaitGroup
+	runStats := newStats()
+
 	suiteVal := reflect.ValueOf(suite)
 	suiteType := suiteVal.Type()
 
@@ -91,7 +95,21 @@ func RunSuite(t *testing.T, suite interface{}) {
 					setUpTestVal.Call([]reflect.Value{tVal})
 				}
 
-				methodVal.Call([]reflect.Value{tVal})
+				// Call the actual test function in something that we can recover from
+				func() {
+					defer func() {
+						if r := recover(); r != nil {
+							runStats.Failed++
+						} else {
+							runStats.Passed++
+						}
+
+						testGroup.Done()
+					}()
+
+					testGroup.Add(1)
+					methodVal.Call([]reflect.Value{tVal})
+				}()
 
 				if tearDownTestVal.IsValid() && tearDownTestVal.Kind() == reflect.Func {
 					tearDownTestType, _ := suiteType.MethodByName(tearDownTestName)
@@ -115,4 +133,11 @@ func RunSuite(t *testing.T, suite interface{}) {
 
 		tearDownSuiteVal.Call(nil)
 	}
+
+	testGroup.Wait()
+	fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d\n",
+		suiteName,
+		runStats.Passed+runStats.Failed,
+		runStats.Passed,
+		runStats.Failed)
 }
