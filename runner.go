@@ -99,6 +99,17 @@ func RunSuite(t *testing.T, suite interface{}) {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
+							failure, ok := r.(*testFailure)
+							if !ok {
+								panic(r)
+							}
+
+							fmt.Printf("-------------------------------------------------\n")
+							fmt.Printf("FAIL: %s\n\n%s:%d\n",
+								testName,
+								failure.Filename, failure.LineNumber)
+							fmt.Printf("%s\n\n", failure.Message)
+
 							runStats.Failed++
 						} else {
 							runStats.Passed++
