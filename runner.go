@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"sync"
 	"testing"
+	"time"
 )
 
 var (
@@ -34,26 +35,66 @@ func hasParams(method reflect.Method, paramTypes []reflect.Type) bool {
 	return true
 }
 
-func SetUpAllTests(f func(t *testing.T)) func(t *testing.T) {
+type suiteRunner struct {
+	name  string
+	suite interface{}
+}
+
+type S struct {
+	suites  []*suiteRunner
+	plugins []Plugin
+}
+
+func T(f func(s *S)) {
+	s := &S{
+		suites:  make([]*suiteRunner, 0),
+		plugins: make([]Plugin, 0),
+	}
+	s.RegisterPlugin(newStatsPlugin())
+
+	f(s)
+
+	s.runPlugins(func(plugin Plugin) {
+		plugin.Finished()
+	})
+}
+
+func (s *S) SetUpAllTests(f func(t *testing.T)) func(t *testing.T) {
 	setUpAllTests = f
 
 	return f
 }
 
-func RunSuite(t *testing.T, suite interface{}) {
-	var testGroup sync.WaitGroup
-	runStats := newStats()
+func (s *S) RegisterPlugin(plugin Plugin) {
+	s.plugins = append(s.plugins, plugin)
+}
 
-	suiteVal := reflect.ValueOf(suite)
+func (s *S) runPlugins(f func(plugin Plugin)) {
+	for _, plugin := range s.plugins {
+		f(plugin)
+	}
+}
+
+func (s *S) RunSuite(t *testing.T, suite interface{}) {
+	suiteStart := time.Now()
+
+	runner := &suiteRunner{
+		suite: suite,
+	}
+	s.suites = append(s.suites, runner)
+
+	var testGroup sync.WaitGroup
+
+	suiteVal := reflect.ValueOf(runner.suite)
 	suiteType := suiteVal.Type()
 
-	suiteName := suiteType.Name()
+	runner.name = suiteType.Name()
 	if suiteVal.CanInterface() {
 		suiteIfaceVal := reflect.Indirect(suiteVal)
 		if suiteIfaceVal == reflect.Zero(suiteType) {
-			suiteName = "UnknownSuite"
+			runner.name = "UnknownSuite"
 		} else {
-			suiteName = suiteIfaceVal.Type().Name()
+			runner.name = suiteIfaceVal.Type().Name()
 		}
 	}
 
@@ -73,13 +114,18 @@ func RunSuite(t *testing.T, suite interface{}) {
 		setUpSuiteVal.Call(nil)
 	}
 
+	s.runPlugins(func(plugin Plugin) {
+		plugin.SuiteStarting(runner.name)
+	})
 	for idx := 0; idx < suiteVal.NumMethod(); idx++ {
 		methodType := suiteType.Method(idx)
 
 		if methodType.Name[:4] == "Test" {
 			methodVal := suiteVal.Method(idx)
-			testName := fmt.Sprintf("%s/%s", suiteName, methodType.Name)
-			t.Run(testName, func(t *testing.T) {
+			testName := methodType.Name
+			testFullName := fmt.Sprintf("%s/%s", runner.name, methodType.Name)
+			testStart := time.Now()
+			t.Run(testFullName, func(t *testing.T) {
 				if setUpAllTests != nil {
 					setUpAllTests(t)
 				}
@@ -96,6 +142,8 @@ func RunSuite(t *testing.T, suite interface{}) {
 				}
 
 				// Call the actual test function in something that we can recover from
+				testFailed := false
+				failureStats := &TestFailedStats{}
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -104,21 +152,26 @@ func RunSuite(t *testing.T, suite interface{}) {
 								panic(r)
 							}
 
+							failureStats.File = failure.Filename
+							failureStats.Line = failure.LineNumber
+							failureStats.Message = failure.Message
+
 							fmt.Printf("-------------------------------------------------\n")
 							fmt.Printf("FAIL: %s\n\n%s:%d\n",
-								testName,
+								testFullName,
 								failure.Filename, failure.LineNumber)
 							fmt.Printf("%s\n\n", failure.Message)
 
-							runStats.Failed++
-						} else {
-							runStats.Passed++
+							testFailed = true
 						}
 
 						testGroup.Done()
 					}()
 
 					testGroup.Add(1)
+					s.runPlugins(func(plugin Plugin) {
+						plugin.TestStarting(runner.name, testName)
+					})
 					methodVal.Call([]reflect.Value{tVal})
 				}()
 
@@ -131,6 +184,16 @@ func RunSuite(t *testing.T, suite interface{}) {
 
 					tearDownTestVal.Call([]reflect.Value{tVal})
 				}
+
+				s.runPlugins(func(plugin Plugin) {
+					if testFailed {
+						plugin.TestFailed(runner.name, testName, failureStats)
+					} else {
+						plugin.TestPassed(runner.name, testName, &TestPassedStats{
+							Time: time.Since(testStart),
+						})
+					}
+				})
 			})
 		}
 	}
@@ -146,9 +209,10 @@ func RunSuite(t *testing.T, suite interface{}) {
 	}
 
 	testGroup.Wait()
-	fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d\n",
-		suiteName,
-		runStats.Passed+runStats.Failed,
-		runStats.Passed,
-		runStats.Failed)
+
+	s.runPlugins(func(plugin Plugin) {
+		plugin.SuiteFinished(runner.name, &SuiteFinishedStats{
+			Time: time.Since(suiteStart),
+		})
+	})
 }
