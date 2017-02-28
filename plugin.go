@@ -6,6 +6,8 @@ import (
 
 type Plugin interface {
 	Name() string
+	Options() *PluginOptions
+	SetOption(name, value string)
 
 	Starting()
 	SuiteStarting(suite string)
@@ -14,6 +16,15 @@ type Plugin interface {
 	TestFailed(suite, test string, stats *TestFailedStats)
 	SuiteFinished(suite string, stats *SuiteFinishedStats)
 	Finished()
+}
+
+type PluginOptions struct {
+	Prefix  string
+	Options map[string]*PluginOption
+}
+type PluginOption struct {
+	Help    string
+	Default string
 }
 
 type TestPassedStats struct {

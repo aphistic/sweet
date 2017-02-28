@@ -22,6 +22,14 @@ func (p *statsPlugin) Name() string {
 	return "Test Stats"
 }
 
+func (p *statsPlugin) Options() *PluginOptions {
+	return nil
+}
+
+func (p *statsPlugin) SetOption(name, value string) {
+
+}
+
 func (p *statsPlugin) Starting() {
 
 }

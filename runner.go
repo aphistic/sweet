@@ -2,7 +2,10 @@ package sweet
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"sort"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -36,27 +39,68 @@ func hasParams(method reflect.Method, paramTypes []reflect.Type) bool {
 }
 
 type suiteRunner struct {
-	name  string
-	suite interface{}
+	Name  string
+	Suite interface{}
+}
+
+type registeredOptions struct {
+	Plugin  Plugin
+	Options *PluginOptions
 }
 
 type S struct {
 	suites  []*suiteRunner
 	plugins []Plugin
+	options map[string]*registeredOptions
 }
 
 func T(f func(s *S)) {
+	if *flagHelp {
+		flagSkipRuns = true
+	}
+
 	s := &S{
 		suites:  make([]*suiteRunner, 0),
 		plugins: make([]Plugin, 0),
+		options: make(map[string]*registeredOptions),
 	}
 	s.RegisterPlugin(newStatsPlugin())
 
 	f(s)
 
-	s.runPlugins(func(plugin Plugin) {
-		plugin.Finished()
-	})
+	if !flagSkipRuns {
+		s.runPlugins(func(plugin Plugin) {
+			plugin.Finished()
+		})
+	}
+
+	if *flagHelp {
+		fmt.Println("Sweet Options")
+		fmt.Println("=============")
+
+		fmt.Println("-sweet.help: Displays this help text")
+		fmt.Println("-sweet.opt: Passes an argument to a sweet plugin.")
+		fmt.Println("            Ex: -sweet.opt \"plug.myopt=myval\"")
+		fmt.Println("")
+
+		sortedPrefixes := make([]string, 0)
+		for prefix := range s.options {
+			sortedPrefixes = append(sortedPrefixes, prefix)
+		}
+		sort.Strings(sortedPrefixes)
+
+		for _, prefix := range sortedPrefixes {
+			opts := s.options[prefix]
+
+			for optionName, optSetting := range opts.Options.Options {
+				fmt.Printf("  %s.%s - %s\n", prefix, optionName, optSetting.Help)
+			}
+		}
+
+		fmt.Println("")
+
+		os.Exit(0)
+	}
 }
 
 func (s *S) SetUpAllTests(f func(t *testing.T)) func(t *testing.T) {
@@ -66,6 +110,45 @@ func (s *S) SetUpAllTests(f func(t *testing.T)) func(t *testing.T) {
 }
 
 func (s *S) RegisterPlugin(plugin Plugin) {
+	if plugin == nil {
+		return
+	}
+
+	plugOpts := plugin.Options()
+	if plugOpts != nil {
+		if oldOpts, ok := s.options[plugOpts.Prefix]; ok {
+			fmt.Fprintf(os.Stderr,
+				"ERROR: Sweet option prefix \"%s\" has already been registered by %s.\n",
+				oldOpts.Options.Prefix, oldOpts.Plugin.Name())
+			fmt.Fprintf(os.Stderr,
+				"You may have accidentally registered the same plugin twice or a plugin you're\n"+
+					"using may have a colliding options prefix with another you're using.\n\n")
+			os.Exit(1)
+		}
+
+		s.options[plugOpts.Prefix] = &registeredOptions{
+			Plugin:  plugin,
+			Options: plugOpts,
+		}
+
+		// When registering a plugin, go through each option and see if it matches
+		// a plugin option.  If it does, set the option in the plugin
+
+		for _, opt := range flagOpts {
+			valIdx := strings.Index(opt, "=")
+			value := ""
+			if valIdx >= 0 {
+				value = opt[valIdx+1:]
+			}
+			name := opt[:valIdx]
+
+			if strings.HasPrefix(name, plugOpts.Prefix+".") {
+				plugName := name[len(plugOpts.Prefix+"."):]
+				plugin.SetOption(plugName, value)
+			}
+		}
+	}
+
 	s.plugins = append(s.plugins, plugin)
 }
 
@@ -76,25 +159,29 @@ func (s *S) runPlugins(f func(plugin Plugin)) {
 }
 
 func (s *S) RunSuite(t *testing.T, suite interface{}) {
+	if flagSkipRuns {
+		return
+	}
+
 	suiteStart := time.Now()
 
 	runner := &suiteRunner{
-		suite: suite,
+		Suite: suite,
 	}
 	s.suites = append(s.suites, runner)
 
 	var testGroup sync.WaitGroup
 
-	suiteVal := reflect.ValueOf(runner.suite)
+	suiteVal := reflect.ValueOf(runner.Suite)
 	suiteType := suiteVal.Type()
 
-	runner.name = suiteType.Name()
+	runner.Name = suiteType.Name()
 	if suiteVal.CanInterface() {
 		suiteIfaceVal := reflect.Indirect(suiteVal)
 		if suiteIfaceVal == reflect.Zero(suiteType) {
-			runner.name = "UnknownSuite"
+			runner.Name = "UnknownSuite"
 		} else {
-			runner.name = suiteIfaceVal.Type().Name()
+			runner.Name = suiteIfaceVal.Type().Name()
 		}
 	}
 
@@ -115,7 +202,7 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 	}
 
 	s.runPlugins(func(plugin Plugin) {
-		plugin.SuiteStarting(runner.name)
+		plugin.SuiteStarting(runner.Name)
 	})
 	for idx := 0; idx < suiteVal.NumMethod(); idx++ {
 		methodType := suiteType.Method(idx)
@@ -123,7 +210,7 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 		if methodType.Name[:4] == "Test" {
 			methodVal := suiteVal.Method(idx)
 			testName := methodType.Name
-			testFullName := fmt.Sprintf("%s/%s", runner.name, methodType.Name)
+			testFullName := fmt.Sprintf("%s/%s", runner.Name, methodType.Name)
 			testStart := time.Now()
 			t.Run(testFullName, func(t *testing.T) {
 				if setUpAllTests != nil {
@@ -170,7 +257,7 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 
 					testGroup.Add(1)
 					s.runPlugins(func(plugin Plugin) {
-						plugin.TestStarting(runner.name, testName)
+						plugin.TestStarting(runner.Name, testName)
 					})
 					methodVal.Call([]reflect.Value{tVal})
 				}()
@@ -187,9 +274,9 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 
 				s.runPlugins(func(plugin Plugin) {
 					if testFailed {
-						plugin.TestFailed(runner.name, testName, failureStats)
+						plugin.TestFailed(runner.Name, testName, failureStats)
 					} else {
-						plugin.TestPassed(runner.name, testName, &TestPassedStats{
+						plugin.TestPassed(runner.Name, testName, &TestPassedStats{
 							Time: time.Since(testStart),
 						})
 					}
@@ -211,7 +298,7 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 	testGroup.Wait()
 
 	s.runPlugins(func(plugin Plugin) {
-		plugin.SuiteFinished(runner.name, &SuiteFinishedStats{
+		plugin.SuiteFinished(runner.Name, &SuiteFinishedStats{
 			Time: time.Since(suiteStart),
 		})
 	})
