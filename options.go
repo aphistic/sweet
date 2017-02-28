@@ -17,6 +17,8 @@ var (
 	flagSkipRuns bool
 	flagOpts     optFlags
 	flagHelp     = flag.Bool("sweet.help", false, "Shows help information for sweet and registered plugins")
+	flagInclude  = flag.String("sweet.include", "", "Only run tests that match the provided expression")
+	flagExclude  = flag.String("sweet.exclude", "", "Do not include tests that match the provided expression")
 )
 
 func init() {

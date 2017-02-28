@@ -185,6 +185,13 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 		}
 	}
 
+	if *flagInclude != "" && *flagInclude != runner.Name {
+		return
+	}
+	if *flagExclude != "" && *flagExclude == runner.Name {
+		return
+	}
+
 	setUpSuiteVal := suiteVal.MethodByName(setUpSuiteName)
 	tearDownSuiteVal := suiteVal.MethodByName(tearDownSuiteName)
 
