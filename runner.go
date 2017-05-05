@@ -288,6 +288,10 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 						})
 					}
 				})
+
+				if testFailed {
+					t.Fail()
+				}
 			})
 		}
 	}

@@ -56,13 +56,18 @@ func (p *statsPlugin) Finished() {
 		sortedNames = append(sortedNames, key)
 	}
 
-	for _, name := range sortedNames {
-		suite := p.suites[name]
-		fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d\n",
-			name,
-			suite.Passed+suite.Failed,
-			suite.Passed,
-			suite.Failed)
+	if len(sortedNames) > 0 {
+		fmt.Printf("Suite Results:\n")
+		fmt.Printf("--------------\n")
+		for _, name := range sortedNames {
+			suite := p.suites[name]
+			fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d\n",
+				name,
+				suite.Passed+suite.Failed,
+				suite.Passed,
+				suite.Failed)
+		}
+		fmt.Println("")
 	}
 }
 
