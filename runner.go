@@ -185,11 +185,25 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 		}
 	}
 
-	if *flagInclude != "" && *flagInclude != runner.Name {
-		return
+	lowerName := strings.ToLower(runner.Name)
+	if len(flagInclude) > 0 {
+		found := false
+		for _, name := range flagInclude {
+			if strings.ToLower(name) == lowerName {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return
+		}
 	}
-	if *flagExclude != "" && *flagExclude == runner.Name {
-		return
+	if len(flagExclude) > 0 {
+		for _, name := range flagExclude {
+			if strings.ToLower(name) == lowerName {
+				return
+			}
+		}
 	}
 
 	setUpSuiteVal := suiteVal.MethodByName(setUpSuiteName)
