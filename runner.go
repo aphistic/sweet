@@ -3,6 +3,7 @@ package sweet
 import (
 	"fmt"
 	"os"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -250,8 +251,9 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 				}
 
 				// Call the actual test function in something that we can recover from
-				testFailed := false
-				failureStats := &TestFailedStats{}
+				failureStats := &TestFailedStats{
+					Frames: make([]*TestFailedFrame, 0),
+				}
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
@@ -260,17 +262,24 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 								panic(r)
 							}
 
-							failureStats.File = failure.Filename
-							failureStats.Line = failure.LineNumber
 							failureStats.Message = failure.Message
 
 							fmt.Printf("-------------------------------------------------\n")
-							fmt.Printf("FAIL: %s\n\n%s:%d\n",
-								testFullName,
-								failure.Filename, failure.LineNumber)
+							fmt.Printf("FAIL: %s\n\n", testFullName)
+
+							failureStats.Frames = make([]*TestFailedFrame, len(failure.Frames))
+							frameCount := len(failure.Frames) - 1
+							for idx := frameCount; idx >= 0; idx-- {
+								frame := failure.Frames[idx]
+								failureStats.Frames[frameCount-idx] = &TestFailedFrame{
+									File: frame.Filename,
+									Line: frame.LineNumber,
+								}
+								fmt.Printf("%s:%d\n", path.Base(frame.Filename), frame.LineNumber)
+							}
 							fmt.Printf("%s\n\n", failure.Message)
 
-							testFailed = true
+							t.Fail()
 						}
 
 						testGroup.Done()
@@ -294,7 +303,7 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 				}
 
 				s.runPlugins(func(plugin Plugin) {
-					if testFailed {
+					if t.Failed() {
 						plugin.TestFailed(runner.Name, testName, failureStats)
 					} else {
 						plugin.TestPassed(runner.Name, testName, &TestPassedStats{
@@ -303,9 +312,6 @@ func (s *S) RunSuite(t *testing.T, suite interface{}) {
 					}
 				})
 
-				if testFailed {
-					t.Fail()
-				}
 			})
 		}
 	}

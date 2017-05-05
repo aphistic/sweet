@@ -33,9 +33,12 @@ type TestPassedStats struct {
 
 type TestFailedStats struct {
 	Time    time.Duration
-	File    string
-	Line    int
 	Message string
+	Frames  []*TestFailedFrame
+}
+type TestFailedFrame struct {
+	File string
+	Line int
 }
 
 type SuiteFinishedStats struct {

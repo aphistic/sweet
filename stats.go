@@ -57,6 +57,7 @@ func (p *statsPlugin) Finished() {
 	}
 
 	if len(sortedNames) > 0 {
+		fmt.Println("")
 		fmt.Printf("Suite Results:\n")
 		fmt.Printf("--------------\n")
 		for _, name := range sortedNames {
