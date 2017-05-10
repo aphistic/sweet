@@ -7,11 +7,11 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func Test(t *testing.T) {
+func TestMain(m *testing.M) {
 	RegisterFailHandler(sweet.GomegaFail)
 
-	sweet.T(func(s *sweet.S) {
-		s.RunSuite(t, &FailSuite{})
+	sweet.Run(m, func(s *sweet.S) {
+		s.AddSuite(&FailSuite{})
 	})
 }
 

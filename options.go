@@ -1,7 +1,9 @@
 package sweet
 
-import "flag"
-import "strings"
+import (
+	"flag"
+	"strings"
+)
 
 type stringSliceFlags []string
 

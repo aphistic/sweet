@@ -32,6 +32,7 @@ type TestPassedStats struct {
 }
 
 type TestFailedStats struct {
+	Name    string
 	Time    time.Duration
 	Message string
 	Frames  []*TestFailedFrame

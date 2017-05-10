@@ -6,12 +6,12 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func Test(t *testing.T) {
+func TestMain(m *testing.M) {
 	RegisterFailHandler(GomegaFail)
 
-	T(func(s *S) {
-		s.RunSuite(t, &RunnerSuite{})
-		s.RunSuite(t, &FailureSuite{})
-		s.RunSuite(t, &ReturnCodeSuite{})
+	Run(m, func(s *S) {
+		s.AddSuite(&RunnerSuite{})
+		s.AddSuite(&FailureSuite{})
+		s.AddSuite(&ReturnCodeSuite{})
 	})
 }

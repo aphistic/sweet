@@ -39,22 +39,16 @@ func isGoPackage(path string) bool {
 	return false
 }
 
+// GomegaFail is a utility function provided to hook into the Gomega matcher library. To use
+// this it's easiest to do the following in your set up test:
+//   func Test(t *testing.T) {
+//       RegisterFailHandler(sweet.GomegaFail)
+//
+//       sweet.T(func(s *sweet.S) {
+//           // ... Suite set up ...
+//       })
+//   }
 func GomegaFail(message string, callerSkip ...int) {
-	/*
-		debug.PrintStack()
-
-		fmt.Printf("Caller skip: %#v\n", callerSkip)
-
-		idx := 0
-		for {
-			_, file, line, ok := runtime.Caller(idx)
-			fmt.Printf("Caller - %s:%d\n", file, line)
-			if !ok {
-				break
-			}
-			idx++
-		}*/
-
 	failFrames := make([]*failureFrame, 0)
 	if len(callerSkip) > 0 {
 		callIdx := callerSkip[0] + 1
