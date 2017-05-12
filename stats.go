@@ -2,6 +2,8 @@ package sweet
 
 import "fmt"
 
+import "sort"
+
 type statsPlugin struct {
 	suites map[string]*suiteStats
 }
@@ -55,6 +57,7 @@ func (p *statsPlugin) Finished() {
 	for key := range p.suites {
 		sortedNames = append(sortedNames, key)
 	}
+	sort.Strings(sortedNames)
 
 	if len(sortedNames) > 0 {
 		fmt.Println("")

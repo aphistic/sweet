@@ -103,7 +103,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 					t.Errorf("Unable to create IO pipe: %s", err)
 					return
 				}
-				os.Stdout = stdout.W()
+				//os.Stdout = stdout.W()
 
 				if setUpAllTests != nil {
 					setUpAllTests(t)
