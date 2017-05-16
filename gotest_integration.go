@@ -165,3 +165,7 @@ func (testDeps) WriteHeapProfile(w io.Writer) error {
 func (testDeps) WriteProfileTo(name string, w io.Writer, debug int) error {
 	return pprof.Lookup(name).WriteTo(w, debug)
 }
+
+func (testDeps) ImportPath() string {
+	return ""
+}
