@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"regexp"
 	"runtime"
 	"sort"
 	"strings"
@@ -69,9 +70,9 @@ func Run(m *testing.M, f func(s *S)) {
 		fmt.Println("Sweet Options")
 		fmt.Println("=============")
 
-		fmt.Println("-sweet.help: Displays this help text")
-		fmt.Println("-sweet.opt: Passes an argument to a sweet plugin.")
-		fmt.Println("            Ex: -sweet.opt \"plug.myopt=myval\"")
+		fmt.Println("-sweet.help:\tDisplays this help text")
+		fmt.Println("-sweet.opt:\tPasses an argument to a sweet plugin.")
+		fmt.Println("\t\tEx: -sweet.opt \"plug.myopt=myval\"")
 		fmt.Println("")
 
 		sortedPrefixes := make([]string, 0)
@@ -91,6 +92,25 @@ func Run(m *testing.M, f func(s *S)) {
 		fmt.Println("")
 
 		os.Exit(0)
+	}
+
+	includeRegexes = make([]*regexp.Regexp, len(flagInclude), len(flagInclude))
+	for idx, pattern := range flagInclude {
+		re, err := regexp.Compile("(?i)" + pattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not compile include expression '%s'\n", pattern)
+			os.Exit(1)
+		}
+		includeRegexes[idx] = re
+	}
+	excludeRegexes = make([]*regexp.Regexp, len(flagExclude), len(flagExclude))
+	for idx, pattern := range flagExclude {
+		re, err := regexp.Compile("(?i)" + pattern)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Could not compile exclude expression '%s'\n", pattern)
+			os.Exit(1)
+		}
+		excludeRegexes[idx] = re
 	}
 
 	newM, err := mainStart(s)

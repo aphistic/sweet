@@ -5,7 +5,6 @@ import (
 	"os"
 	"path"
 	"reflect"
-	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -47,27 +46,6 @@ func (s *suiteRunner) Run(t *testing.T) {
 		}
 	}
 
-	lowerName := strings.ToLower(suiteName)
-	if len(flagInclude) > 0 {
-		found := false
-		for _, name := range flagInclude {
-			if strings.ToLower(name) == lowerName {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return
-		}
-	}
-	if len(flagExclude) > 0 {
-		for _, name := range flagExclude {
-			if strings.ToLower(name) == lowerName {
-				return
-			}
-		}
-	}
-
 	setUpSuiteVal := suiteVal.MethodByName(setUpSuiteName)
 	tearDownSuiteVal := suiteVal.MethodByName(tearDownSuiteName)
 
@@ -87,6 +65,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 	s.runPlugins(func(plugin Plugin) {
 		plugin.SuiteStarting(suiteName)
 	})
+testLoop:
 	for idx := 0; idx < suiteVal.NumMethod(); idx++ {
 		methodType := suiteType.Method(idx)
 
@@ -94,6 +73,23 @@ func (s *suiteRunner) Run(t *testing.T) {
 			methodVal := suiteVal.Method(idx)
 			testName := methodType.Name
 			testFullName := fmt.Sprintf("%s/%s", suiteName, methodType.Name)
+
+			if len(includeRegexes) > 0 {
+				for _, re := range includeRegexes {
+					if !re.MatchString(testFullName) {
+						continue testLoop
+					}
+				}
+			}
+
+			if len(excludeRegexes) > 0 {
+				for _, re := range excludeRegexes {
+					if re.MatchString(testFullName) {
+						continue testLoop
+					}
+				}
+			}
+
 			testStart := time.Now()
 			t.Run(testFullName, func(t *testing.T) {
 				// Start capturing stdout so we only display it when a test fails.

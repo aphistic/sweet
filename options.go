@@ -2,6 +2,7 @@ package sweet
 
 import (
 	"flag"
+	"regexp"
 	"strings"
 )
 
@@ -23,6 +24,9 @@ var (
 	flagExtended = flag.Bool("sweet.extended", false, "Shows extended error information for failed tests")
 	flagInclude  stringSliceFlags
 	flagExclude  stringSliceFlags
+
+	includeRegexes []*regexp.Regexp
+	excludeRegexes []*regexp.Regexp
 )
 
 func init() {
