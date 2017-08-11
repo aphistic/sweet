@@ -2,8 +2,6 @@ package sweet
 
 import (
 	"bytes"
-	"fmt"
-	"io"
 	"os"
 )
 
@@ -49,11 +47,8 @@ readLoop:
 		}
 
 		rN, err := pc.r.Read(buf)
-		if err == io.EOF {
-			return
-		}
 		if err != nil {
-			panic(fmt.Sprintf("Error reading from buffer: %s", err))
+			return
 		}
 
 		writeStart := 0
@@ -61,7 +56,7 @@ readLoop:
 		for {
 			wN, err := pc.buf.Write(buf[writeStart : rN-writeStart])
 			if err != nil {
-				panic(fmt.Sprintf("Error writing to buffer: %s", err))
+				return
 			}
 			writeStart += wN
 			if writeStart == rN {
