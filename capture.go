@@ -2,16 +2,18 @@ package sweet
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
-
-	"github.com/aphistic/boom"
 )
 
 type pipeCapture struct {
-	r    *os.File
-	w    *os.File
-	buf  bytes.Buffer
-	task *boom.Task
+	r   *os.File
+	w   *os.File
+	buf bytes.Buffer
+
+	runChan  chan struct{}
+	stopChan chan struct{}
 }
 
 func newPipeCapture() (*pipeCapture, error) {
@@ -23,29 +25,35 @@ func newPipeCapture() (*pipeCapture, error) {
 	pc := &pipeCapture{
 		r: r,
 		w: w,
-	}
-	pc.task = boom.RunTask(pc.readPipe)
 
-	pc.task.WaitForRunning(0)
+		runChan:  make(chan struct{}),
+		stopChan: make(chan struct{}),
+	}
+
+	go pc.readPipe()
+	<-pc.runChan
 
 	return pc, nil
 }
 
-func (pc *pipeCapture) readPipe(task *boom.Task, args ...interface{}) boom.TaskResult {
-	task.SetRunning(true)
+func (pc *pipeCapture) readPipe() {
+	close(pc.runChan)
 	buf := make([]byte, 2048)
 
 readLoop:
 	for {
 		select {
-		case <-task.Stopping():
+		case <-pc.stopChan:
 			break readLoop
 		default:
 		}
 
 		rN, err := pc.r.Read(buf)
+		if err == io.EOF {
+			return
+		}
 		if err != nil {
-			return boom.NewErrorResult(err)
+			panic(fmt.Sprintf("Error reading from buffer: %s", err))
 		}
 
 		writeStart := 0
@@ -53,7 +61,7 @@ readLoop:
 		for {
 			wN, err := pc.buf.Write(buf[writeStart : rN-writeStart])
 			if err != nil {
-				return boom.NewErrorResult(err)
+				panic(fmt.Sprintf("Error writing to buffer: %s", err))
 			}
 			writeStart += wN
 			if writeStart == rN {
@@ -61,8 +69,6 @@ readLoop:
 			}
 		}
 	}
-
-	return nil
 }
 
 func (pc *pipeCapture) W() *os.File {
