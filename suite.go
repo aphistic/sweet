@@ -123,6 +123,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 
 				// Call the actual test function in something that we can recover from
 				failureStats := &TestFailedStats{
+					Name:   testFullName,
 					Frames: make([]*TestFailedFrame, 0),
 				}
 				func() {
@@ -133,7 +134,6 @@ func (s *suiteRunner) Run(t *testing.T) {
 								panic(r)
 							}
 
-							failureStats.Name = testFullName
 							failureStats.Message = failure.Message
 							failureStats.Frames = make([]*TestFailedFrame, len(failure.Frames))
 							frameCount := len(failure.Frames) - 1

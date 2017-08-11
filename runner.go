@@ -72,6 +72,9 @@ func Run(m *testing.M, f func(s *S)) {
 		fmt.Println("-sweet.help: Displays this help text")
 		fmt.Println("-sweet.opt: Passes an argument to a sweet plugin.")
 		fmt.Println("            Ex: -sweet.opt \"plug.myopt=myval\"")
+		fmt.Println("-sweet.include: Only run tests that match the provided expression")
+		fmt.Println("-sweet.exclude: Do not include tests that match the provided expression")
+		fmt.Println("-sweet.extended: Show extended error information for failed tests")
 		fmt.Println("")
 
 		sortedPrefixes := make([]string, 0)
