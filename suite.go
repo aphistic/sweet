@@ -2,7 +2,6 @@ package sweet
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"reflect"
 	"strings"
@@ -14,13 +13,21 @@ import (
 type suiteRunner struct {
 	s     *S
 	suite interface{}
+
+	suppressDeprecation bool
+	deprecatedUsages    []string
 }
 
 func newSuiteRunner(s *S, suite interface{}) *suiteRunner {
 	return &suiteRunner{
-		s:     s,
-		suite: suite,
+		s:                s,
+		suite:            suite,
+		deprecatedUsages: make([]string, 0),
 	}
+}
+
+func (s *suiteRunner) addDeprecationWarning(funcName string) {
+	s.deprecatedUsages = append(s.deprecatedUsages, funcName)
 }
 
 func (s *suiteRunner) runPlugins(f func(plugin Plugin)) {
@@ -68,20 +75,31 @@ func (s *suiteRunner) Run(t *testing.T) {
 		}
 	}
 
-	setUpSuiteVal := suiteVal.MethodByName(setUpSuiteName)
-	tearDownSuiteVal := suiteVal.MethodByName(tearDownSuiteName)
+	setUpSuiteVal := suiteVal.MethodByName(defSetUpSuite.Name)
+	tearDownSuiteVal := suiteVal.MethodByName(defTearDownSuite.Name)
 
-	setUpTestVal := suiteVal.MethodByName(setUpTestName)
-	tearDownTestVal := suiteVal.MethodByName(tearDownTestName)
+	setUpTestVal := suiteVal.MethodByName(defSetUpTest.Name)
+	tearDownTestVal := suiteVal.MethodByName(defTearDownTest.Name)
 
-	if setUpSuiteVal.IsValid() && setUpSuiteVal.Kind() == reflect.Func {
-		setUpSuiteType, _ := suiteType.MethodByName(setUpSuiteName)
-
-		if !hasParams(setUpSuiteType, setUpSuiteParams) {
-			panic(fmt.Sprintf("%s expects %d parameter(s)", setUpSuiteName, len(setUpSuiteParams)))
+	v, err := defSetUpSuite.Validate(setUpSuiteVal)
+	if err == errDeprecated {
+		if !s.suppressDeprecation {
+			s.addDeprecationWarning(formatName(suiteName, defSetUpSuite.Name))
 		}
 
-		setUpSuiteVal.Call(nil)
+		// We handled the error, clear it so the set up still runs
+		err = nil
+	} else if err == errInvalidValue {
+		// Skip running the suite set up because it doesn't exist.
+	} else if err != nil {
+		panic(fmt.Sprintf("%s has an unsupported method signature",
+			formatName(suiteName, defSetUpSuite.Name)))
+	}
+	if err == nil {
+		switch v {
+		case 1:
+			setUpSuiteVal.Call(nil)
+		}
 	}
 
 	s.runPlugins(func(plugin Plugin) {
@@ -93,32 +111,39 @@ func (s *suiteRunner) Run(t *testing.T) {
 		if methodType.Name[:4] == "Test" {
 			methodVal := suiteVal.Method(idx)
 			testName := methodType.Name
-			testFullName := fmt.Sprintf("%s/%s", suiteName, methodType.Name)
+			testFullName := formatName(suiteName, methodType.Name)
 			testStart := time.Now()
 			t.Run(testFullName, func(t *testing.T) {
-				// Start capturing stdout so we only display it when a test fails.
-				oldStdout := os.Stdout
-				stdout, err := newPipeCapture()
-				if err != nil {
-					t.Errorf("Unable to create IO pipe: %s", err)
-					return
-				}
-				//os.Stdout = stdout.W()
+				wrapT := newSweetT(t)
+
+				tVal := reflect.ValueOf(t)
+				wrapTVal := reflect.ValueOf(wrapT)
 
 				if setUpAllTests != nil {
 					setUpAllTests(t)
 				}
 
-				tVal := reflect.ValueOf(t)
-				if setUpTestVal.IsValid() && setUpTestVal.Kind() == reflect.Func {
-					setUpTestType, _ := suiteType.MethodByName(setUpTestName)
-
-					if !hasParams(setUpTestType, setUpTestParams) {
-						t.Errorf("%s expects %d parameter(s)", setUpTestName, len(setUpTestParams))
-						return
+				v, err := defSetUpTest.Validate(setUpTestVal)
+				if err == errDeprecated {
+					if !s.suppressDeprecation {
+						s.addDeprecationWarning(formatName(suiteName, defSetUpTest.Name))
 					}
 
-					setUpTestVal.Call([]reflect.Value{tVal})
+					// Clean out the error because we've handled it
+					err = nil
+				} else if err == errInvalidValue {
+					// Continue on because a test set up wasn't provided.
+				} else if err != nil {
+					panic(fmt.Sprintf("%s has an unsupported method signature",
+						formatName(suiteName, defSetUpTest.Name)))
+				}
+				if err == nil {
+					switch v {
+					case 1:
+						setUpTestVal.Call([]reflect.Value{tVal})
+					case 2:
+						setUpTestVal.Call([]reflect.Value{wrapTVal})
+					}
 				}
 
 				// Call the actual test function in something that we can recover from
@@ -129,23 +154,26 @@ func (s *suiteRunner) Run(t *testing.T) {
 				func() {
 					defer func() {
 						if r := recover(); r != nil {
-							failure, ok := r.(*testFailure)
-							if !ok {
+							switch result := r.(type) {
+							case *testFailed:
+								failureStats.Message = result.Message
+								failureStats.Frames = make(
+									[]*TestFailedFrame,
+									len(result.Frames),
+								)
+								frameCount := len(result.Frames) - 1
+								for idx := frameCount; idx >= 0; idx-- {
+									frame := result.Frames[idx]
+									failureStats.Frames[frameCount-idx] = &TestFailedFrame{
+										File: frame.Filename,
+										Line: frame.LineNumber,
+									}
+								}
+							case *testSkipped:
+								fmt.Printf("test skipped\n")
+							default:
 								panic(r)
 							}
-
-							failureStats.Message = failure.Message
-							failureStats.Frames = make([]*TestFailedFrame, len(failure.Frames))
-							frameCount := len(failure.Frames) - 1
-							for idx := frameCount; idx >= 0; idx-- {
-								frame := failure.Frames[idx]
-								failureStats.Frames[frameCount-idx] = &TestFailedFrame{
-									File: frame.Filename,
-									Line: frame.LineNumber,
-								}
-							}
-
-							t.Fail()
 						}
 
 						testGroup.Done()
@@ -155,18 +183,50 @@ func (s *suiteRunner) Run(t *testing.T) {
 					s.runPlugins(func(plugin Plugin) {
 						plugin.TestStarting(suiteName, testName)
 					})
-					methodVal.Call([]reflect.Value{tVal})
+
+					v, err := defTest.Validate(methodVal)
+					if err == errDeprecated {
+						if !s.suppressDeprecation {
+							s.addDeprecationWarning(formatName(suiteName, testName))
+						}
+
+						// We handled the error, clear it so the test still runs
+						err = nil
+					} else if err == errInvalidValue {
+						panic("There's a test we can't get info for, context the Sweet dev!\n")
+					} else if err != nil {
+						panic(fmt.Sprintf("%s has an unsupported method signature.",
+							formatName(suiteName, testName)))
+					}
+					if err == nil {
+						switch v {
+						case 1:
+							methodVal.Call([]reflect.Value{tVal})
+						case 2:
+							methodVal.Call([]reflect.Value{wrapTVal})
+						}
+					}
 				}()
 
-				if tearDownTestVal.IsValid() && tearDownTestVal.Kind() == reflect.Func {
-					tearDownTestType, _ := suiteType.MethodByName(tearDownTestName)
-
-					if !hasParams(tearDownTestType, tearDownTestParams) {
-						t.Errorf("%s expects %d parameter(s)", tearDownTestName, len(tearDownTestParams))
-						return
+				v, err = defTearDownTest.Validate(tearDownTestVal)
+				if err == errDeprecated {
+					if !s.suppressDeprecation {
+						s.addDeprecationWarning(formatName(suiteName, defTearDownTest.Name))
 					}
 
-					tearDownTestVal.Call([]reflect.Value{tVal})
+					// We handled the error, clear it so the clean up still runs
+					err = nil
+				} else if err == errInvalidValue {
+					// Continue on because a test tear down was not provided
+				} else if err != nil {
+					panic(fmt.Sprintf("%s has an unsupported method signature",
+						formatName(suiteName, defTearDownTest.Name)))
+				}
+				if err == nil {
+					switch v {
+					case 1:
+						tearDownTestVal.Call([]reflect.Value{tVal})
+					}
 				}
 
 				if tearDownAllTests != nil {
@@ -174,8 +234,12 @@ func (s *suiteRunner) Run(t *testing.T) {
 				}
 
 				s.runPlugins(func(plugin Plugin) {
-					if t.Failed() {
+					if wrapT.Failed() {
 						plugin.TestFailed(suiteName, testName, failureStats)
+					} else if wrapT.Skipped() {
+						plugin.TestSkipped(suiteName, testName, &TestSkippedStats{
+							Time: time.Since(testStart),
+						})
 					} else {
 						plugin.TestPassed(suiteName, testName, &TestPassedStats{
 							Time: time.Since(testStart),
@@ -183,37 +247,46 @@ func (s *suiteRunner) Run(t *testing.T) {
 					}
 				})
 
-				// Restore stdout before we try printing to it
-				os.Stdout = oldStdout
-				stdout.Close()
-
-				if t.Failed() {
+				if wrapT.Failed() {
 					fmt.Printf("-------------------------------------------------\n")
 					fmt.Printf("FAIL: %s\n\n", failureStats.Name)
+
+					for _, line := range wrapT.output {
+						fmt.Print(line)
+					}
+					if len(wrapT.output) > 0 {
+						fmt.Printf("\n")
+					}
 
 					for _, frame := range failureStats.Frames {
 						fmt.Printf("%s:%d\n", path.Base(frame.File), frame.Line)
 					}
-					fmt.Printf("%s\n\n", failureStats.Message)
 
-					if len(stdout.Buffer()) > 0 {
-						fmt.Println("stdout:")
-						fmt.Print(string(stdout.Buffer()))
-						fmt.Println()
-					}
+					fmt.Printf("%s\n\n", failureStats.Message)
 				}
 			})
 		}
 	}
 
-	if tearDownSuiteVal.IsValid() && tearDownSuiteVal.Kind() == reflect.Func {
-		tearDownSuiteType, _ := suiteType.MethodByName(tearDownSuiteName)
-
-		if !hasParams(tearDownSuiteType, tearDownSuiteParams) {
-			panic(fmt.Sprintf("%s expects %d parameter(s)", tearDownSuiteName, len(tearDownSuiteParams)))
+	v, err = defTearDownSuite.Validate(tearDownSuiteVal)
+	if err == errDeprecated {
+		if !s.suppressDeprecation {
+			s.addDeprecationWarning(formatName(suiteName, defTearDownSuite.Name))
 		}
 
-		tearDownSuiteVal.Call(nil)
+		// We handled the error, clear it so the tear down is still run
+		err = nil
+	} else if err == errInvalidValue {
+		// Continue on because a suite tear down was not provided.
+	} else if err != nil {
+		panic(fmt.Sprintf("%s has an unsupported method signature",
+			formatName(suiteName, defTearDownSuite.Name)))
+	}
+	if err == nil {
+		switch v {
+		case 1:
+			tearDownSuiteVal.Call(nil)
+		}
 	}
 
 	testGroup.Wait()

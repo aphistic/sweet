@@ -15,8 +15,7 @@ func mainStart(s *S) (*testing.M, error) {
 	tests = append(tests, testing.InternalTest{
 		Name: "Tests",
 		F: func(t *testing.T) {
-			for _, suite := range s.addedSuites {
-				runner := newSuiteRunner(s, suite)
+			for _, runner := range s.suiteRunners {
 				runner.Run(t)
 			}
 		},

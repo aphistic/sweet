@@ -14,22 +14,6 @@ import (
 var (
 	setUpAllTests    func(t *testing.T)
 	tearDownAllTests func(t *testing.T)
-
-	setUpSuiteName   = "SetUpSuite"
-	setUpSuiteParams = []reflect.Type{}
-
-	setUpTestName   = "SetUpTest"
-	setUpTestParams = []reflect.Type{
-		reflect.TypeOf(&testing.T{}),
-	}
-
-	tearDownTestName   = "TearDownTest"
-	tearDownTestParams = []reflect.Type{
-		reflect.TypeOf(&testing.T{}),
-	}
-
-	tearDownSuiteName   = "TearDownSuite"
-	tearDownSuiteParams = []reflect.Type{}
 )
 
 func hasParams(method reflect.Method, paramTypes []reflect.Type) bool {
@@ -45,7 +29,8 @@ type registeredOptions struct {
 }
 
 type S struct {
-	addedSuites []interface{}
+	suiteRunners     []*suiteRunner
+	deprecatedSuites map[interface{}]bool
 
 	plugins []Plugin
 	options map[string]*registeredOptions
@@ -57,9 +42,11 @@ func Run(m *testing.M, f func(s *S)) {
 	}
 
 	s := &S{
-		addedSuites: make([]interface{}, 0),
-		plugins:     make([]Plugin, 0),
-		options:     make(map[string]*registeredOptions),
+		suiteRunners:     make([]*suiteRunner, 0),
+		deprecatedSuites: make(map[interface{}]bool),
+
+		plugins: make([]Plugin, 0),
+		options: make(map[string]*registeredOptions),
 	}
 	s.RegisterPlugin(newStatsPlugin())
 
@@ -113,6 +100,48 @@ func Run(m *testing.M, f func(s *S)) {
 
 	for _, plugin := range s.plugins {
 		plugin.Finished()
+	}
+
+	const deprecationExampleLength = 3
+	deprecatedUsages := make([]string, 0)
+	for _, runner := range s.suiteRunners {
+		uniqueNames := make(map[string]bool)
+		for _, dep := range runner.deprecatedUsages {
+			uniqueNames[dep] = true
+		}
+		for dep := range uniqueNames {
+			deprecatedUsages = append(deprecatedUsages, dep)
+		}
+	}
+	sort.Strings(deprecatedUsages)
+
+	if len(deprecatedUsages) > 0 {
+		fmt.Fprintf(os.Stderr,
+			"Some test methods are using a deprecated version of the method signature. "+
+				"Please update them to the latest version as seen in the documentation at "+
+				"https://github.com/aphistic/sweet. Some of the deprecated usages are the "+
+				"following:\n",
+		)
+
+		for idx, usage := range deprecatedUsages {
+			additionalUsages := len(deprecatedUsages) - deprecationExampleLength
+
+			fmt.Fprintf(os.Stderr, usage)
+			if idx < deprecationExampleLength-1 {
+				fmt.Fprintf(os.Stderr, ",")
+			} else if idx >= deprecationExampleLength-1 {
+				if additionalUsages > 0 {
+					fmt.Fprintf(os.Stderr, "... %d other(s).\n", additionalUsages)
+				} else {
+					fmt.Fprintf(os.Stderr, "\n")
+				}
+				break
+			}
+
+			fmt.Fprintf(os.Stderr, " ")
+		}
+
+		fmt.Fprintf(os.Stderr, "\n")
 	}
 
 	os.Exit(code)
@@ -173,5 +202,13 @@ func (s *S) RegisterPlugin(plugin Plugin) {
 }
 
 func (s *S) AddSuite(suite interface{}) {
-	s.addedSuites = append(s.addedSuites, suite)
+	s.suiteRunners = append(s.suiteRunners, newSuiteRunner(s, suite))
+}
+
+func (s *S) suppressDeprecation(suite interface{}) {
+	for _, runner := range s.suiteRunners {
+		if runner.suite == suite {
+			runner.suppressDeprecation = true
+		}
+	}
 }

@@ -2,8 +2,6 @@ package sweet
 
 import (
 	"os/exec"
-	"testing"
-
 	"syscall"
 
 	. "github.com/onsi/gomega"
@@ -11,7 +9,7 @@ import (
 
 type ReturnCodeSuite struct{}
 
-func (s *ReturnCodeSuite) TestFailureReturnCode(t *testing.T) {
+func (s *ReturnCodeSuite) TestFailureReturnCode(t T) {
 	// This is SUPER meta and weird.  We're actually going to run
 	// "go test" on the "failtests" directory and make sure it returns
 	// a non-zero status code
@@ -30,7 +28,7 @@ func (s *ReturnCodeSuite) TestFailureReturnCode(t *testing.T) {
 
 type RunnerSuite struct{}
 
-func (s *RunnerSuite) TestFailInGoroutines(t *testing.T) {
+func (s *RunnerSuite) TestFailInGoroutines(t T) {
 	/*ch := make(chan struct{})
 	go func() {
 		defer close(ch)
@@ -39,7 +37,7 @@ func (s *RunnerSuite) TestFailInGoroutines(t *testing.T) {
 	<-ch*/
 }
 
-func (s *RunnerSuite) TestGomegaFailInGoroutines(t *testing.T) {
+func (s *RunnerSuite) TestGomegaFailInGoroutines(t T) {
 	/*ch := make(chan struct{})
 	go func() {
 		defer close(ch)

@@ -9,9 +9,10 @@ type statsPlugin struct {
 }
 
 type suiteStats struct {
-	Name   string
-	Passed int
-	Failed int
+	Name    string
+	Passed  int
+	Failed  int
+	Skipped int
 }
 
 func newStatsPlugin() *statsPlugin {
@@ -36,7 +37,9 @@ func (p *statsPlugin) Starting() {
 
 }
 func (p *statsPlugin) SuiteStarting(suite string) {
-
+	// Get the suite so stats are aware of it and it shows up
+	// in the final results
+	p.getSuite(suite)
 }
 func (p *statsPlugin) TestStarting(suite, test string) {
 
@@ -44,6 +47,10 @@ func (p *statsPlugin) TestStarting(suite, test string) {
 func (p *statsPlugin) TestPassed(suite, test string, stats *TestPassedStats) {
 	s := p.getSuite(suite)
 	s.Passed++
+}
+func (p *statsPlugin) TestSkipped(suite, test string, stats *TestSkippedStats) {
+	s := p.getSuite(suite)
+	s.Skipped++
 }
 func (p *statsPlugin) TestFailed(suite, test string, stats *TestFailedStats) {
 	s := p.getSuite(suite)
@@ -65,11 +72,12 @@ func (p *statsPlugin) Finished() {
 		fmt.Printf("--------------\n")
 		for _, name := range sortedNames {
 			suite := p.suites[name]
-			fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d\n",
+			fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d, Skipped: %d\n",
 				name,
-				suite.Passed+suite.Failed,
+				suite.Passed+suite.Failed+suite.Skipped,
 				suite.Passed,
-				suite.Failed)
+				suite.Failed,
+				suite.Skipped)
 		}
 		fmt.Println("")
 	}

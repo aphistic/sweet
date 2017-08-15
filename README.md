@@ -43,7 +43,7 @@ func TestMain(m *testing.M) {
 
 type FailSuite struct {}
 
-func (s *FailSuite) TestAlwaysFails(t *testing.T) {
+func (s *FailSuite) TestAlwaysFails(t sweet.T) {
     t.Fail()
 }
 ```
@@ -73,7 +73,7 @@ func TestMain(m *testing.M) {
 
 type FailSuite struct {}
 
-func (s *FailSuite) TestAlwaysFails(t *testing.T) {
+func (s *FailSuite) TestAlwaysFails(t sweet.T) {
     t.Fail()
 }
 ```
@@ -112,7 +112,7 @@ func TestMain(m *testing.M) {
 
 type FailSuite struct {}
 
-func (s *FailSuite) TestAlwaysFails(t *testing.T) {
+func (s *FailSuite) TestAlwaysFails(t sweet.T) {
     t.Fail()
 }
 ```
