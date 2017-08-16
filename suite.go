@@ -255,7 +255,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 						fmt.Print(line)
 					}
 					if len(wrapT.output) > 0 {
-						fmt.Printf("\n")
+						fmt.Printf("\n\n")
 					}
 
 					for _, frame := range failureStats.Frames {
