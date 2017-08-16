@@ -12,8 +12,8 @@ import (
 )
 
 var (
-	setUpAllTests    func(t *testing.T)
-	tearDownAllTests func(t *testing.T)
+	setUpAllTests    func(t T)
+	tearDownAllTests func(t T)
 )
 
 func hasParams(method reflect.Method, paramTypes []reflect.Type) bool {
@@ -147,12 +147,12 @@ func Run(m *testing.M, f func(s *S)) {
 	os.Exit(code)
 }
 
-func (s *S) SetUpAllTests(f func(t *testing.T)) func(t *testing.T) {
+func (s *S) SetUpAllTests(f func(t T)) func(t T) {
 	setUpAllTests = f
 
 	return f
 }
-func (s *S) TearDownAllTests(f func(t *testing.T)) func(t *testing.T) {
+func (s *S) TearDownAllTests(f func(t T)) func(t T) {
 	tearDownAllTests = f
 
 	return f

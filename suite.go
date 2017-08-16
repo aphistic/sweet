@@ -120,7 +120,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 				wrapTVal := reflect.ValueOf(wrapT)
 
 				if setUpAllTests != nil {
-					setUpAllTests(t)
+					setUpAllTests(wrapT)
 				}
 
 				v, err := defSetUpTest.Validate(setUpTestVal)
@@ -230,7 +230,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 				}
 
 				if tearDownAllTests != nil {
-					tearDownAllTests(t)
+					tearDownAllTests(wrapT)
 				}
 
 				s.runPlugins(func(plugin Plugin) {
