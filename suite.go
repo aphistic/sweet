@@ -171,13 +171,13 @@ func (s *suiteRunner) Run(t *testing.T) {
 										Line: frame.LineNumber,
 									}
 								}
+								wrapT.Fail()
 							case *testSkipped:
-								fmt.Printf("test skipped\n")
+								// Nothing to do for this because it was handled before
+								// the panic
 							default:
 								panic(r)
 							}
-
-							wrapT.Fail()
 						}
 
 						testGroup.Done()
