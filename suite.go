@@ -14,6 +14,8 @@ type suiteRunner struct {
 	s     *S
 	suite interface{}
 
+	suiteFailed bool
+
 	suppressDeprecation bool
 	deprecatedUsages    []string
 }
@@ -174,6 +176,8 @@ func (s *suiteRunner) Run(t *testing.T) {
 							default:
 								panic(r)
 							}
+
+							wrapT.Fail()
 						}
 
 						testGroup.Done()
@@ -248,6 +252,8 @@ func (s *suiteRunner) Run(t *testing.T) {
 				})
 
 				if wrapT.Failed() {
+					s.suiteFailed = true
+
 					fmt.Printf("-------------------------------------------------\n")
 					fmt.Printf("FAIL: %s\n\n", failureStats.Name)
 

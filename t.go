@@ -58,6 +58,7 @@ func (t *sweetT) Fail() {
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
+	t.t.Fail()
 	t.failed = true
 }
 func (t *sweetT) FailNow() {
