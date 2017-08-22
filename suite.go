@@ -116,7 +116,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 			testFullName := formatName(suiteName, methodType.Name)
 			testStart := time.Now()
 			t.Run(testFullName, func(t *testing.T) {
-				wrapT := newSweetT(t)
+				wrapT := newSweetT(t, testName)
 
 				tVal := reflect.ValueOf(t)
 				wrapTVal := reflect.ValueOf(wrapT)

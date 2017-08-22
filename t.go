@@ -28,7 +28,8 @@ type T interface {
 var _ T = &sweetT{}
 
 type sweetT struct {
-	t *testing.T
+	t    *testing.T
+	name string
 
 	output []string
 
@@ -38,9 +39,11 @@ type sweetT struct {
 	failed  bool
 }
 
-func newSweetT(t *testing.T) *sweetT {
+func newSweetT(t *testing.T, name string) *sweetT {
 	return &sweetT{
-		t:      t,
+		t:    t,
+		name: name,
+
 		output: make([]string, 0),
 	}
 }
@@ -89,7 +92,7 @@ func (t *sweetT) Logf(format string, args ...interface{}) {
 }
 
 func (t *sweetT) Name() string {
-	return t.t.Name()
+	return t.name
 }
 
 func (t *sweetT) Parallel() {
