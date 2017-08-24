@@ -1,6 +1,9 @@
 package sweet
 
 import "fmt"
+import "golang.org/x/crypto/ssh/terminal"
+import "os"
+import "github.com/mgutz/ansi"
 
 import "sort"
 
@@ -66,20 +69,46 @@ func (p *statsPlugin) Finished() {
 	}
 	sort.Strings(sortedNames)
 
+	out := os.Stdout
+	isTerm := terminal.IsTerminal(int(out.Fd()))
+
+	passColor := ansi.ColorFunc("green")
+	failColor := ansi.ColorFunc("red")
+	skipColor := ansi.ColorFunc("yellow")
+
 	if len(sortedNames) > 0 {
-		fmt.Println("")
-		fmt.Printf("Suite Results:\n")
-		fmt.Printf("--------------\n")
+		fmt.Fprintln(out, "")
+		fmt.Fprintf(out, "Suite Results:\n")
+		fmt.Fprintf(out, "--------------\n")
 		for _, name := range sortedNames {
 			suite := p.suites[name]
-			fmt.Printf("%s - Total: %d, Passed: %d, Failed: %d, Skipped: %d\n",
+
+			totalStr := fmt.Sprintf("%d", suite.Passed+suite.Failed+suite.Skipped)
+
+			passedStr := fmt.Sprintf("%d", suite.Passed)
+			if isTerm && suite.Passed > 0 {
+				passedStr = passColor(passedStr)
+			}
+
+			failedStr := fmt.Sprintf("%d", suite.Failed)
+			if isTerm && suite.Failed > 0 {
+				failedStr = failColor(failedStr)
+			}
+
+			skippedStr := fmt.Sprintf("%d", suite.Skipped)
+			if isTerm && suite.Skipped > 0 {
+				skippedStr = skipColor(skippedStr)
+			}
+
+			fmt.Fprintf(out, "%s - Total: %s, Passed: %s, Failed: %s, Skipped: %s\n",
 				name,
-				suite.Passed+suite.Failed+suite.Skipped,
-				suite.Passed,
-				suite.Failed,
-				suite.Skipped)
+				totalStr,
+				passedStr,
+				failedStr,
+				skippedStr,
+			)
 		}
-		fmt.Println("")
+		fmt.Fprintln(out, "")
 	}
 }
 
