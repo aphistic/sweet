@@ -51,7 +51,7 @@ func skipTest(message string) {
 func failTest(message string, callerSkip ...int) {
 	failFrames := make([]*failureFrame, 0)
 	if len(callerSkip) > 0 {
-		callIdx := callerSkip[0] + 1
+		callIdx := callerSkip[0] + 2
 		callers := make([]uintptr, 0)
 		for {
 			pc, file, _, ok := runtime.Caller(callIdx)

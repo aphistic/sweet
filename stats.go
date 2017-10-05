@@ -1,21 +1,26 @@
 package sweet
 
-import "fmt"
-import "golang.org/x/crypto/ssh/terminal"
-import "os"
-import "github.com/mgutz/ansi"
+import (
+	"fmt"
+	"os"
+	"sort"
+	"sync"
+	"sync/atomic"
 
-import "sort"
+	"github.com/mgutz/ansi"
+	"golang.org/x/crypto/ssh/terminal"
+)
 
 type statsPlugin struct {
-	suites map[string]*suiteStats
+	suitesLock sync.Mutex
+	suites     map[string]*suiteStats
 }
 
 type suiteStats struct {
 	Name    string
-	Passed  int
-	Failed  int
-	Skipped int
+	Passed  int64
+	Failed  int64
+	Skipped int64
 }
 
 func newStatsPlugin() *statsPlugin {
@@ -49,15 +54,15 @@ func (p *statsPlugin) TestStarting(suite, test string) {
 }
 func (p *statsPlugin) TestPassed(suite, test string, stats *TestPassedStats) {
 	s := p.getSuite(suite)
-	s.Passed++
+	atomic.AddInt64(&s.Passed, 1)
 }
 func (p *statsPlugin) TestSkipped(suite, test string, stats *TestSkippedStats) {
 	s := p.getSuite(suite)
-	s.Skipped++
+	atomic.AddInt64(&s.Skipped, 1)
 }
 func (p *statsPlugin) TestFailed(suite, test string, stats *TestFailedStats) {
 	s := p.getSuite(suite)
-	s.Failed++
+	atomic.AddInt64(&s.Failed, 1)
 }
 func (p *statsPlugin) SuiteFinished(suite string, stats *SuiteFinishedStats) {
 
@@ -113,6 +118,8 @@ func (p *statsPlugin) Finished() {
 }
 
 func (p *statsPlugin) getSuite(name string) *suiteStats {
+	p.suitesLock.Lock()
+	defer p.suitesLock.Unlock()
 	suite, ok := p.suites[name]
 	if !ok {
 		suite = &suiteStats{
