@@ -111,7 +111,13 @@ func (s *suiteRunner) Run(t *testing.T) {
 				methodVal := suiteVal.Method(idx)
 				testName := methodType.Name
 				t.Run(testName, func(t *testing.T) {
-					s.testRunner(t, methodVal, suiteName, suiteVal)
+					s.testRunner(
+						testName,
+						t,
+						methodVal,
+						suiteName,
+						suiteVal,
+					)
 				})
 			}
 		}
@@ -146,18 +152,18 @@ func (s *suiteRunner) Run(t *testing.T) {
 }
 
 func (s *suiteRunner) testRunner(
+	testName string,
 	t *testing.T,
 	methodVal reflect.Value,
 	suiteName string,
 	suiteVal reflect.Value,
 ) {
-	testName := t.Name()
 	testFullName := fmt.Sprintf("%s/%s", suiteName, testName)
 
 	setUpTestVal := suiteVal.MethodByName(defSetUpTest.Name)
 	tearDownTestVal := suiteVal.MethodByName(defTearDownTest.Name)
 
-	wrapT := newSweetT(t, t.Name())
+	wrapT := newSweetT(t, testName)
 
 	tVal := reflect.ValueOf(t)
 	wrapTVal := reflect.ValueOf(wrapT)
