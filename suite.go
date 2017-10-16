@@ -54,7 +54,9 @@ func (s *suiteRunner) Run(t *testing.T) {
 	}
 
 	t.Run(suiteName, func(t *testing.T) {
-		t.Parallel()
+		if *flagParallelSuites {
+			t.Parallel()
+		}
 
 		lowerName := strings.ToLower(suiteName)
 		if len(flagInclude) > 0 {

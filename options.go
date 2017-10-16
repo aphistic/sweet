@@ -17,12 +17,13 @@ func (f *stringSliceFlags) Set(value string) error {
 }
 
 var (
-	flagSkipRuns bool
-	flagOpts     stringSliceFlags
-	flagHelp     = flag.Bool("sweet.help", false, "Shows help information for sweet and registered plugins")
-	flagExtended = flag.Bool("sweet.extended", false, "Shows extended error information for failed tests")
-	flagInclude  stringSliceFlags
-	flagExclude  stringSliceFlags
+	flagSkipRuns       bool
+	flagOpts           stringSliceFlags
+	flagHelp           = flag.Bool("sweet.help", false, "Shows help information for sweet and registered plugins")
+	flagExtended       = flag.Bool("sweet.extended", false, "Shows extended error information for failed tests")
+	flagInclude        stringSliceFlags
+	flagExclude        stringSliceFlags
+	flagParallelSuites = flag.Bool("sweet.parallelsuites", false, "Suites will be run in parallel instead of synchronously.")
 )
 
 func init() {
