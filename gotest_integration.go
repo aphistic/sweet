@@ -145,6 +145,10 @@ func isV1_8MainStart() bool {
 // versions of testing.MainStart
 type testDeps struct{}
 
+func (testDeps) ImportPath() string {
+	return ""
+}
+
 func (testDeps) MatchString(pat, str string) (bool, error) {
 	return false, nil
 }
@@ -157,14 +161,18 @@ func (testDeps) StopCPUProfile() {
 	pprof.StopCPUProfile()
 }
 
+// TODO figure out what Go 1.10 is doing with these
+func (testDeps) StartTestLog(w io.Writer) {
+}
+
+func (testDeps) StopTestLog() error {
+	return nil
+}
+
 func (testDeps) WriteHeapProfile(w io.Writer) error {
 	return pprof.WriteHeapProfile(w)
 }
 
 func (testDeps) WriteProfileTo(name string, w io.Writer, debug int) error {
 	return pprof.Lookup(name).WriteTo(w, debug)
-}
-
-func (testDeps) ImportPath() string {
-	return ""
 }
