@@ -2,9 +2,27 @@ package sweet
 
 import (
 	"fmt"
+	"io/ioutil"
 	"sync"
 	"testing"
 )
+
+type SweetUtil interface {
+	LoadFile(path string) []byte
+}
+
+type sweetUtil struct {
+	t T
+}
+
+func (u *sweetUtil) LoadFile(path string) []byte {
+	data, err := ioutil.ReadFile(path)
+	if err != nil {
+		failTest(err.Error(), 0)
+	}
+
+	return data
+}
 
 type T interface {
 	Error(args ...interface{})
@@ -23,6 +41,8 @@ type T interface {
 	SkipNow()
 	Skipf(format string, args ...interface{})
 	Skipped() bool
+
+	Sweet() SweetUtil
 }
 
 var _ T = &sweetT{}
@@ -37,15 +57,22 @@ type sweetT struct {
 
 	skipped bool
 	failed  bool
+
+	util *sweetUtil
 }
 
 func newSweetT(t *testing.T, name string) *sweetT {
-	return &sweetT{
+	newT := &sweetT{
 		t:    t,
 		name: name,
 
 		output: make([]string, 0),
 	}
+	newT.util = &sweetUtil{
+		t: newT,
+	}
+
+	return newT
 }
 
 func (t *sweetT) Error(args ...interface{}) {
@@ -129,4 +156,8 @@ func (t *sweetT) Skipped() bool {
 	defer t.lock.RUnlock()
 
 	return t.skipped
+}
+
+func (t *sweetT) Sweet() SweetUtil {
+	return t.util
 }

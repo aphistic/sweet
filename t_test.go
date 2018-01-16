@@ -1,12 +1,18 @@
 package sweet
 
-/*
 import (
-	"fmt"
-	. "github.com/onsi/gomega"
+//	"fmt"
+//	. "github.com/onsi/gomega"
 )
-*/
+
 type TSuite struct{}
+
+/*
+func (s *TSuite) TestLoadFile(t T) {
+	t.Sweet().LoadFile("asdf")
+	t.Logf("after load\n")
+}
+*/
 
 /*func (s *TSuite) TestFatalThing(t T) {
 	t.Fatal("Testing logging\n")
