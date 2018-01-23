@@ -278,6 +278,8 @@ func (s *suiteRunner) testRunner(
 		switch v {
 		case 1:
 			tearDownTestVal.Call([]reflect.Value{tVal})
+		case 2:
+			tearDownTestVal.Call([]reflect.Value{wrapTVal})
 		}
 	}
 
