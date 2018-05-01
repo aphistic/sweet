@@ -51,7 +51,8 @@ type sweetT struct {
 	t    *testing.T
 	name string
 
-	output []string
+	logLock sync.RWMutex
+	output  []string
 
 	lock sync.RWMutex
 
@@ -112,9 +113,15 @@ func (t *sweetT) Fatalf(format string, args ...interface{}) {
 }
 
 func (t *sweetT) Log(args ...interface{}) {
+	t.logLock.Lock()
+	defer t.logLock.Unlock()
+
 	t.output = append(t.output, fmt.Sprint(args...))
 }
 func (t *sweetT) Logf(format string, args ...interface{}) {
+	t.logLock.Lock()
+	defer t.logLock.Unlock()
+
 	t.output = append(t.output, fmt.Sprintf(format, args...))
 }
 
