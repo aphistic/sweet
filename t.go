@@ -8,11 +8,30 @@ import (
 )
 
 type SweetUtil interface {
+	ListFiles(path string) []string
 	LoadFile(path string) []byte
 }
 
 type sweetUtil struct {
 	t T
+}
+
+func (u *sweetUtil) ListFiles(path string) []string {
+	nodes, err := ioutil.ReadDir(path)
+	if err != nil {
+		failTest(err.Error(), 0)
+	}
+
+	res := []string{}
+	for _, node := range nodes {
+		if node.IsDir() {
+			continue
+		}
+
+		res = append(res, node.Name())
+	}
+
+	return res
 }
 
 func (u *sweetUtil) LoadFile(path string) []byte {
