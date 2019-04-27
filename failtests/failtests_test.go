@@ -32,3 +32,33 @@ func (s *FailSuite) TestUtilFunc(t sweet.T) {
 	checkTrue(true)
 	checkTrue(false)
 }
+
+type testStruct struct {
+	StringValue string
+	IntValue    int
+	BoolValue   bool
+}
+
+func (s *FailSuite) TestStruct(t sweet.T) {
+	Expect(&testStruct{
+		StringValue: "this is a string",
+		IntValue:    1234,
+		BoolValue:   true,
+	}).To(Equal(&testStruct{
+		StringValue: "this is not a string",
+		IntValue:    1324,
+		BoolValue:   false,
+	}))
+}
+
+func (s *FailSuite) TestLongString(t sweet.T) {
+	Expect(`
+    this
+is
+		a
+string?`).To(Equal(`
+this
+	is	
+		a	string
+	`))
+}

@@ -10,8 +10,9 @@ import (
 )
 
 type suiteRunner struct {
-	s     *S
-	suite interface{}
+	s      *S
+	suite  interface{}
+	differ *differ
 
 	suiteFailed bool
 
@@ -23,6 +24,7 @@ func newSuiteRunner(s *S, suite interface{}) *suiteRunner {
 	return &suiteRunner{
 		s:                s,
 		suite:            suite,
+		differ:           newDiffer(),
 		deprecatedUsages: make([]string, 0),
 	}
 }
@@ -318,6 +320,8 @@ func (s *suiteRunner) testRunner(
 			fmt.Printf("%s:%d\n", path.Base(frame.File), frame.Line)
 		}
 
-		fmt.Printf("%s\n\n", failureStats.Message)
+		diffMessage := s.differ.ProcessMessage(failureStats.Message)
+
+		fmt.Printf("%s\n\n", diffMessage)
 	}
 }
