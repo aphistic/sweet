@@ -16,13 +16,15 @@ var (
 type testCompletion interface{}
 
 type failureFrame struct {
-	Filename   string
-	LineNumber int
+	Filename    string
+	LineNumber  int
+	HiddenFrame bool
 }
 
 type testFailed struct {
-	Message string
-	Frames  []*failureFrame
+	TestName *TestName
+	Message  string
+	Frames   []*failureFrame
 }
 
 type testSkipped struct{}
@@ -69,9 +71,29 @@ func failTest(message string, callerSkip ...int) {
 		frames := runtime.CallersFrames(callers)
 		for {
 			frame, more := frames.Next()
+
+			hiddenFrame := false
+			// Skip any frames that are part of the go testing package or don't actually
+			// have a function name... cuz wtf is that anyway? Seems like they're runtime
+			// package functions.
+			if frame.Function == "" || strings.HasPrefix(frame.Function, "testing.") {
+				hiddenFrame = true
+			}
+
+			// Also, skip any frames that are part of sweet itself based on the package
+			// name. We only skip any frames that are in the root sweet package and
+			// are not in a _test.go file so we still get file names when testing
+			// sweet itself.
+			if strings.HasPrefix(frame.Function, packageName+".") {
+				if !strings.HasSuffix(frame.File, "_test.go") {
+					hiddenFrame = true
+				}
+			}
+
 			failFrames = append(failFrames, &failureFrame{
-				Filename:   frame.File,
-				LineNumber: frame.Line,
+				Filename:    frame.File,
+				LineNumber:  frame.Line,
+				HiddenFrame: hiddenFrame,
 			})
 
 			if !more {

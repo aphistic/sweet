@@ -49,19 +49,19 @@ func (p *statsPlugin) SuiteStarting(suite string) {
 	// in the final results
 	p.getSuite(suite)
 }
-func (p *statsPlugin) TestStarting(suite, test string) {
+func (p *statsPlugin) TestStarting(testName *TestName) {
 
 }
-func (p *statsPlugin) TestPassed(suite, test string, stats *TestPassedStats) {
-	s := p.getSuite(suite)
+func (p *statsPlugin) TestPassed(testName *TestName, stats *TestPassedStats) {
+	s := p.getSuite(testName.SuiteName)
 	atomic.AddInt64(&s.Passed, 1)
 }
-func (p *statsPlugin) TestSkipped(suite, test string, stats *TestSkippedStats) {
-	s := p.getSuite(suite)
+func (p *statsPlugin) TestSkipped(testName *TestName, stats *TestSkippedStats) {
+	s := p.getSuite(testName.SuiteName)
 	atomic.AddInt64(&s.Skipped, 1)
 }
-func (p *statsPlugin) TestFailed(suite, test string, stats *TestFailedStats) {
-	s := p.getSuite(suite)
+func (p *statsPlugin) TestFailed(testName *TestName, stats *TestFailedStats) {
+	s := p.getSuite(testName.SuiteName)
 	atomic.AddInt64(&s.Failed, 1)
 }
 func (p *statsPlugin) SuiteFinished(suite string, stats *SuiteFinishedStats) {

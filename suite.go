@@ -17,7 +17,7 @@ type suiteRunner struct {
 	suiteFailed bool
 
 	suppressDeprecation bool
-	deprecatedUsages    []string
+	deprecatedUsages    []*TestName
 }
 
 func newSuiteRunner(s *S, suite interface{}) *suiteRunner {
@@ -25,12 +25,12 @@ func newSuiteRunner(s *S, suite interface{}) *suiteRunner {
 		s:                s,
 		suite:            suite,
 		differ:           newDiffer(),
-		deprecatedUsages: make([]string, 0),
+		deprecatedUsages: []*TestName{},
 	}
 }
 
-func (s *suiteRunner) addDeprecationWarning(funcName string) {
-	s.deprecatedUsages = append(s.deprecatedUsages, funcName)
+func (s *suiteRunner) addDeprecationWarning(testName *TestName) {
+	s.deprecatedUsages = append(s.deprecatedUsages, testName)
 }
 
 func (s *suiteRunner) runPlugins(f func(plugin Plugin)) {
@@ -87,7 +87,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 		v, err := defSetUpSuite.Validate(setUpSuiteVal)
 		if err == errDeprecated {
 			if !s.suppressDeprecation {
-				s.addDeprecationWarning(formatName(suiteName, defSetUpSuite.Name))
+				s.addDeprecationWarning(newTestName(suiteName, []string{defSetUpSuite.Name}))
 			}
 
 			// We handled the error, clear it so the set up still runs
@@ -129,7 +129,7 @@ func (s *suiteRunner) Run(t *testing.T) {
 		v, err = defTearDownSuite.Validate(tearDownSuiteVal)
 		if err == errDeprecated {
 			if !s.suppressDeprecation {
-				s.addDeprecationWarning(formatName(suiteName, defTearDownSuite.Name))
+				s.addDeprecationWarning(newTestName(suiteName, []string{defTearDownSuite.Name}))
 			}
 
 			// We handled the error, clear it so the tear down is still run
@@ -162,12 +162,12 @@ func (s *suiteRunner) testRunner(
 	suiteName string,
 	suiteVal reflect.Value,
 ) {
-	testFullName := fmt.Sprintf("%s/%s", suiteName, testName)
+	fullTestName := newTestName(suiteName, []string{testName})
 
 	setUpTestVal := suiteVal.MethodByName(defSetUpTest.Name)
 	tearDownTestVal := suiteVal.MethodByName(defTearDownTest.Name)
 
-	wrapT := newSweetT(t, testName)
+	wrapT := newSweetT(t, fullTestName)
 
 	tVal := reflect.ValueOf(t)
 	wrapTVal := reflect.ValueOf(wrapT)
@@ -179,7 +179,7 @@ func (s *suiteRunner) testRunner(
 	v, err := defSetUpTest.Validate(setUpTestVal)
 	if err == errDeprecated {
 		if !s.suppressDeprecation {
-			s.addDeprecationWarning(formatName(suiteName, defSetUpTest.Name))
+			s.addDeprecationWarning(newTestName(suiteName, []string{defSetUpTest.Name}))
 		}
 
 		// Clean out the error because we've handled it
@@ -201,7 +201,7 @@ func (s *suiteRunner) testRunner(
 
 	// Call the actual test function in something that we can recover from
 	failureStats := &TestFailedStats{
-		Name:   testFullName,
+		Name:   fullTestName,
 		Frames: make([]*TestFailedFrame, 0),
 	}
 	testStart := time.Now()
@@ -210,6 +210,10 @@ func (s *suiteRunner) testRunner(
 			if r := recover(); r != nil {
 				switch result := r.(type) {
 				case *testFailed:
+					if result.TestName != nil {
+						failureStats.Name = result.TestName
+					}
+
 					failureStats.Message = result.Message
 					failureStats.Frames = make(
 						[]*TestFailedFrame,
@@ -219,8 +223,9 @@ func (s *suiteRunner) testRunner(
 					for idx := frameCount; idx >= 0; idx-- {
 						frame := result.Frames[idx]
 						failureStats.Frames[frameCount-idx] = &TestFailedFrame{
-							File: frame.Filename,
-							Line: frame.LineNumber,
+							File:   frame.Filename,
+							Line:   frame.LineNumber,
+							Hidden: frame.HiddenFrame,
 						}
 					}
 					wrapT.Fail()
@@ -234,13 +239,13 @@ func (s *suiteRunner) testRunner(
 		}()
 
 		s.runPlugins(func(plugin Plugin) {
-			plugin.TestStarting(suiteName, testName)
+			plugin.TestStarting(fullTestName)
 		})
 
 		v, err := defTest.Validate(methodVal)
 		if err == errDeprecated {
 			if !s.suppressDeprecation {
-				s.addDeprecationWarning(formatName(suiteName, testName))
+				s.addDeprecationWarning(fullTestName)
 			}
 
 			// We handled the error, clear it so the test still runs
@@ -249,7 +254,8 @@ func (s *suiteRunner) testRunner(
 			panic("There's a test we can't get info for, contact the Sweet dev!\n")
 		} else if err != nil {
 			panic(fmt.Sprintf("%s has an unsupported method signature.",
-				formatName(suiteName, testName)))
+				fullTestName,
+			))
 		}
 		if err == nil {
 			// Run the actual test method
@@ -265,7 +271,7 @@ func (s *suiteRunner) testRunner(
 	v, err = defTearDownTest.Validate(tearDownTestVal)
 	if err == errDeprecated {
 		if !s.suppressDeprecation {
-			s.addDeprecationWarning(formatName(suiteName, defTearDownTest.Name))
+			s.addDeprecationWarning(newTestName(suiteName, []string{defTearDownTest.Name}))
 		}
 
 		// We handled the error, clear it so the clean up still runs
@@ -291,13 +297,13 @@ func (s *suiteRunner) testRunner(
 
 	s.runPlugins(func(plugin Plugin) {
 		if wrapT.Failed() {
-			plugin.TestFailed(suiteName, testName, failureStats)
+			plugin.TestFailed(fullTestName, failureStats)
 		} else if wrapT.Skipped() {
-			plugin.TestSkipped(suiteName, testName, &TestSkippedStats{
+			plugin.TestSkipped(fullTestName, &TestSkippedStats{
 				Time: time.Since(testStart),
 			})
 		} else {
-			plugin.TestPassed(suiteName, testName, &TestPassedStats{
+			plugin.TestPassed(fullTestName, &TestPassedStats{
 				Time: time.Since(testStart),
 			})
 		}
@@ -317,7 +323,9 @@ func (s *suiteRunner) testRunner(
 		}
 
 		for _, frame := range failureStats.Frames {
-			fmt.Printf("%s:%d\n", path.Base(frame.File), frame.Line)
+			if !frame.Hidden {
+				fmt.Printf("%s:%d\n", path.Base(frame.File), frame.Line)
+			}
 		}
 
 		diffMessage := s.differ.ProcessMessage(failureStats.Message)

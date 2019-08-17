@@ -68,7 +68,7 @@ var _ T = &sweetT{}
 
 type sweetT struct {
 	t    *testing.T
-	name string
+	name *TestName
 
 	logLock sync.RWMutex
 	output  []string
@@ -81,7 +81,7 @@ type sweetT struct {
 	util *sweetUtil
 }
 
-func newSweetT(t *testing.T, name string) *sweetT {
+func newSweetT(t *testing.T, name *TestName) *sweetT {
 	newT := &sweetT{
 		t:    t,
 		name: name,
@@ -145,7 +145,7 @@ func (t *sweetT) Logf(format string, args ...interface{}) {
 }
 
 func (t *sweetT) Name() string {
-	return t.name
+	return t.name.String()
 }
 
 func (t *sweetT) Parallel() {
@@ -153,7 +153,30 @@ func (t *sweetT) Parallel() {
 }
 
 func (t *sweetT) Run(name string, f func(t T)) bool {
-	panic("Run on sweet.T is not supported yet")
+	var panicValue interface{}
+
+	subName := t.name.Clone()
+	subName.AddTestName(name)
+
+	runRes := t.t.Run(name, func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				panicValue = r
+			}
+		}()
+		f(newSweetT(t, subName))
+	})
+
+	if panicValue != nil {
+		if pvTestFailed, ok := panicValue.(*testFailed); ok {
+			if pvTestFailed.TestName == nil {
+				pvTestFailed.TestName = subName
+			}
+		}
+		panic(panicValue)
+	}
+
+	return runRes
 }
 
 func (t *sweetT) Skip(args ...interface{}) {

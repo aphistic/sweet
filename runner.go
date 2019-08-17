@@ -107,7 +107,7 @@ func Run(m *testing.M, f func(s *S)) {
 	for _, runner := range s.suiteRunners {
 		uniqueNames := make(map[string]bool)
 		for _, dep := range runner.deprecatedUsages {
-			uniqueNames[dep] = true
+			uniqueNames[dep.String()] = true
 		}
 		for dep := range uniqueNames {
 			deprecatedUsages = append(deprecatedUsages, dep)

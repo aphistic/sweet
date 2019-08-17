@@ -11,10 +11,10 @@ type Plugin interface {
 
 	Starting()
 	SuiteStarting(suite string)
-	TestStarting(suite, test string)
-	TestPassed(suite, test string, stats *TestPassedStats)
-	TestFailed(suite, test string, stats *TestFailedStats)
-	TestSkipped(suite, test string, stats *TestSkippedStats)
+	TestStarting(testName *TestName)
+	TestPassed(testName *TestName, stats *TestPassedStats)
+	TestFailed(testName *TestName, stats *TestFailedStats)
+	TestSkipped(testName *TestName, stats *TestSkippedStats)
 	SuiteFinished(suite string, stats *SuiteFinishedStats)
 	Finished()
 }
@@ -33,14 +33,15 @@ type TestPassedStats struct {
 }
 
 type TestFailedStats struct {
-	Name    string
+	Name    *TestName
 	Time    time.Duration
 	Message string
 	Frames  []*TestFailedFrame
 }
 type TestFailedFrame struct {
-	File string
-	Line int
+	File   string
+	Line   int
+	Hidden bool
 }
 
 type TestSkippedStats struct {

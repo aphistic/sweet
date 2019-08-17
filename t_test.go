@@ -1,10 +1,5 @@
 package sweet
 
-import (
-//	"fmt"
-//	. "github.com/onsi/gomega"
-)
-
 type TSuite struct{}
 
 /*

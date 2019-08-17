@@ -17,6 +17,12 @@ func TestMain(m *testing.M) {
 
 type FailSuite struct{}
 
+func (s *FailSuite) TestSubtestFail(t sweet.T) {
+	t.Run("SubtestName", func(t sweet.T) {
+		Expect(true).To(BeFalse())
+	})
+}
+
 func (s *FailSuite) TestFails(t sweet.T) {
 	Expect(false).To(Equal(true))
 	Expect("foo").To(Equal("bar"))
